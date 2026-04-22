@@ -1,70 +1,183 @@
-# NEXUS-7 // MongoDB Escape Room
+# NEXUS-7
 
-Juego educativo tipo escape room para practicar MongoDB queries. Ambientación cyberpunk, 5 nodos de dificultad progresiva, sistema de vidas y trampas.
+**Escape room cyberpunk para aprender MongoDB.** Infiltrás la corporación NEXUS-7 resolviendo 5 nodos de queries, cada uno custodiado por una IA. Los nodos están encadenados — lo que descubrís en uno se usa en el siguiente — y las variantes cambian entre partidas.
+
+Hecho con React + Mingo (motor de queries MongoDB en el navegador) + Xterm.js. Ranking persistido en SQLite vía un backend Node chico.
+
+---
+
+## Jugar
+
+### Opción A — Docker (todo incluido, con ranking)
+
+Requiere Docker Desktop.
+
+```bash
+docker compose up --build
+```
+
+Abrí http://localhost:8080. Los puntajes se guardan en un volumen de Docker y persisten entre reinicios.
+
+### Opción B — Online (solo juego, sin ranking)
+
+Si hay deploy estático activo: https://kan0p.github.io/Nexus-7
+
+---
+
+## Cómo se juega
+
+- **3 vidas.** 3 errores seguidos en un nodo disparan una trampa y descuentan una vida.
+- **5 nodos.** Cada uno requiere una query MongoDB distinta: equality, `$gt`/`$in`, dot notation, `$lookup`, `$group`.
+- **Ranking.** Al ganar o perder se registra tu puntaje con tu handle.
+
+**Puntaje** (independiente de las vidas):
+
+| Evento                              | Puntos |
+| ----------------------------------- | ------ |
+| Nodo resuelto                       | +1000  |
+| Bonus por velocidad (máx 20s)       | +500   |
+| Query incorrecta                    | −75    |
+| Pista usada                         | −50    |
+| Trampa activada                     | −300   |
+
+**Atajos de la terminal**
+
+- `hint1` / `hint2` — revela pistas (penaliza puntaje).
+- `clear` — limpia la pantalla.
+- Flechas `↑` `↓` — historial de queries.
+
+---
 
 ## Stack
 
-- React 18
-- [Mingo](https://github.com/kofrasa/mingo) — motor de queries MongoDB real en JS (sin backend)
-- [Xterm.js](https://xtermjs.org/) — terminal interactiva auténtica
-- Web Audio API — todos los sonidos generados programáticamente
+- **Frontend:** React 18, [Mingo](https://github.com/kofrasa/mingo), [Xterm.js](https://xtermjs.org/), Web Audio API para sonidos programáticos.
+- **Backend:** Node 20, Express, [better-sqlite3](https://github.com/WiseLibs/better-sqlite3).
+- **Infra:** Docker Compose (web + server + volumen SQLite), nginx sirve el build y proxyea `/api/` al backend.
 
-## Instalación local
+---
+
+## Desarrollo
+
+### Requisitos
+
+- Node 20+
+- Docker (opcional, para probar el stack completo)
+
+### Frontend
 
 ```bash
 npm install
-npm start
+npm start        # http://localhost:3000
 ```
 
-## Build y deploy en GitHub Pages
+### Backend
 
-1. En `package.json`, cambia `"homepage": "."` por tu URL de GitHub Pages:
-   ```json
-   "homepage": "https://tu-usuario.github.io/nexus7"
-   ```
-
-2. Instala gh-pages (ya incluido en devDependencies):
-   ```bash
-   npm install
-   ```
-
-3. Deploy:
-   ```bash
-   npm run deploy
-   ```
-
-Esto hace el build y lo sube automáticamente a la rama `gh-pages` de tu repo.
-
-## Estructura del proyecto
-
-```
-src/
-├── components/
-│   ├── HUD.jsx            — Barra superior: vidas, errores, progreso
-│   ├── NarrativePanel.jsx — Historia del nodo + botones de pista
-│   ├── DataPanel.jsx      — Colección de documentos con syntax highlighting
-│   ├── Terminal.jsx       — Terminal xterm.js con historial de comandos
-│   ├── TrapOverlay.jsx    — Animación de trampa fullscreen
-│   ├── IntroScreen.jsx    — Pantalla de introducción cinemática
-│   └── EndScreens.jsx     — Game Over y Victory screens
-├── data/
-│   └── nodes.js           — Los 5 nodos: narrativa, datos, soluciones, trampas
-├── hooks/
-│   └── useQueryEvaluator.js — Evaluador de queries con Mingo
-├── sounds/
-│   └── audioEngine.js     — Todos los sonidos via Web Audio API
-└── styles/
-    └── global.css         — Estilos cyberpunk: scanlines, glitch, neón
+```bash
+cd server
+npm install
+npm start        # http://localhost:3001
 ```
 
-## Cómo agregar más nodos
+Para que el frontend use el backend local, creá un `.env.local` en la raíz:
 
-Edita `src/data/nodes.js` y agrega un objeto al array `NODES` siguiendo el mismo esquema. Para nodos de tipo `find`, define `expectedIds`. Para nodos de `aggregate`, define `expectedGroups`.
+```
+REACT_APP_RANKING_BASE=http://localhost:3001
+```
 
-## Mecánicas
+Si no hay backend, el juego funciona igual — los endpoints fallan en silencio y no aparece ranking.
 
-- **3 errores en un nodo** → se activa la trampa → pierdes 1 vida
-- **0 vidas** → Game Over
-- **5 nodos completados** → Victoria
-- **Pistas**: escribe `hint1` o `hint2` en la terminal, o usa los botones del panel
-- **Historial**: flechas ↑↓ en la terminal para navegar comandos anteriores
+---
+
+## Agregar un nivel
+
+La arquitectura está pensada para extenderse sin tocar el motor. Cada nivel es un archivo en [`src/levels/`](src/levels/) que exporta un `LevelDefinition`:
+
+```js
+// src/levels/level6.js
+import { matchByIds } from "./matchers";
+
+export const level6 = {
+  id: 6,
+  codename: "MI NIVEL",
+  build(carryIn, rng) {
+    const scenario = {
+      id: 6,
+      codename: "MI NIVEL",
+      subtitle: "...",
+      narrative: "...",
+      objective: "Encuentra X.",
+      collection: "foo",
+      data: [ /* documentos */ ],
+      hints: { hint1: "...", hint2: "..." },
+      trap: { name: "X", msg: "...", type: "electric" },
+      accessCode: "XYZ-000",
+      evaluate: matchByIds([/* _ids esperados */]),
+    };
+    return { scenario, carryOut: { ...carryIn, algoNuevo: 42 } };
+  },
+};
+```
+
+Importalo y pushealo al array `LEVELS` en [`src/levels/registry.js`](src/levels/registry.js). No hay que tocar el evaluator, el HUD ni `App.jsx`.
+
+El objeto `carryIn` son los datos que produjo el nivel anterior. Úsalos para variar tu nivel (por ejemplo, dejar que el dept del empleado encontrado en el N1 determine el sector de las transacciones del N2).
+
+Matchers disponibles en [`src/levels/matchers.js`](src/levels/matchers.js):
+
+- `matchByIds(ids)` — find queries.
+- `matchAggregationGroups(keys)` — `$group` aggregations.
+- `allOf(...matchers)` — composición AND.
+
+---
+
+## API del ranking
+
+| Método | Ruta                     | Descripción                                   |
+| ------ | ------------------------ | --------------------------------------------- |
+| GET    | `/api/health`            | Healthcheck                                   |
+| GET    | `/api/ranking?limit=10`  | Top N runs por score descendente              |
+| GET    | `/api/ranking/best`      | Mejor run único                               |
+| POST   | `/api/ranking`           | Registra un run                               |
+
+El `POST` espera:
+
+```json
+{
+  "name": "HANDLE",
+  "score": 4500,
+  "outcome": "victory",
+  "nodesCompleted": 5,
+  "errors": 3,
+  "hints": 1,
+  "durationMs": 182000
+}
+```
+
+---
+
+## Estructura
+
+```
+├── Dockerfile              — Frontend (build + nginx)
+├── nginx.conf              — SPA fallback + proxy /api/
+├── docker-compose.yml      — web + server + volumen SQLite
+├── server/                 — Backend Node + better-sqlite3
+│   ├── Dockerfile
+│   ├── package.json
+│   └── index.js
+└── src/
+    ├── App.jsx             — Máquina de estados + scoring + timing
+    ├── scoring.js          — Reglas de puntaje
+    ├── components/         — HUD, paneles, terminal, intro, endings, ranking
+    ├── levels/             — Registro, matchers, un archivo por nivel
+    ├── hooks/              — useQueryEvaluator
+    ├── ranking/            — Cliente fetch del ranking
+    ├── sounds/             — Motor de Web Audio
+    └── styles/             — Scanlines, glitch, neón
+```
+
+---
+
+## Créditos
+
+Hecho por [kan0p](https://github.com/kan0p).

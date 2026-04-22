@@ -1,6 +1,6 @@
 // src/App.jsx
-import React, { useState, useCallback } from "react";
-import { NODES, MAX_LIVES, ERRORS_PER_TRAP } from "./data/nodes";
+import React, { useState, useCallback, useMemo, useRef } from "react";
+import { buildGameRun, MAX_LIVES, ERRORS_PER_TRAP } from "./levels/registry";
 import { useQueryEvaluator } from "./hooks/useQueryEvaluator";
 import { HUD } from "./components/HUD";
 import { NarrativePanel } from "./components/NarrativePanel";
@@ -10,9 +10,15 @@ import { TrapOverlay } from "./components/TrapOverlay";
 import { IntroScreen } from "./components/IntroScreen";
 import { GameOverScreen, VictoryScreen } from "./components/EndScreens";
 import { playError, playSuccess, playTrap, playEMP } from "./sounds/audioEngine";
+import {
+  levelAward,
+  errorPenalty,
+  hintPenalty,
+  trapPenalty,
+  clampScore,
+} from "./scoring";
 import "./styles/global.css";
 
-// Game phases
 const PHASE = {
   INTRO: "intro",
   PLAYING: "playing",
@@ -20,80 +26,141 @@ const PHASE = {
   VICTORY: "victory",
 };
 
-function getInitialState() {
+function initialState(scenarios) {
   return {
     phase: PHASE.INTRO,
     nodeIndex: 0,
     lives: MAX_LIVES,
-    errors: 0,        // errors in current node
-    trap: null,       // active trap animation
-    feedback: null,   // last terminal feedback
-    trapDamageQueued: false,
+    errors: 0,
+    trap: null,
+    feedback: null,
+    score: 0,
+    errorsTotal: 0,
+    hintsTotal: 0,
+    scenarios,
+    levelStartedAt: null,
+    runStartedAt: null,
   };
 }
 
 export default function App() {
-  const [state, setState] = useState(getInitialState);
+  // A run = the scenarios produced by buildGameRun. Regenerated on every
+  // restart so variants and carry differ between attempts.
+  const [run, setRun] = useState(() => buildGameRun());
+  const [state, setState] = useState(() => initialState(run.scenarios));
   const { evaluate } = useQueryEvaluator();
+  const hintUsedForNodeRef = useRef(new Set());
 
-  const currentNode = NODES[state.nodeIndex];
+  const scenarios = state.scenarios;
+  const currentScenario = scenarios[state.nodeIndex];
 
   const handleStart = useCallback(() => {
-    setState((s) => ({ ...s, phase: PHASE.PLAYING }));
+    const now = Date.now();
+    setState((s) => ({
+      ...s,
+      phase: PHASE.PLAYING,
+      runStartedAt: now,
+      levelStartedAt: now,
+    }));
   }, []);
 
   const handleRestart = useCallback(() => {
-    setState(getInitialState());
+    hintUsedForNodeRef.current = new Set();
+    const fresh = buildGameRun();
+    setRun(fresh);
+    setState(initialState(fresh.scenarios));
   }, []);
 
+  const handleHintUsed = useCallback((n) => {
+    // Only penalize the first use of each hint per node (avoid farming clicks)
+    const key = `${state.nodeIndex}:${n}`;
+    if (hintUsedForNodeRef.current.has(key)) return;
+    hintUsedForNodeRef.current.add(key);
+    setState((s) => ({
+      ...s,
+      score: clampScore(s.score - hintPenalty()),
+      hintsTotal: s.hintsTotal + 1,
+    }));
+  }, [state.nodeIndex]);
+
   const handleSubmit = useCallback((rawInput) => {
-    // Special commands
     if (rawInput.toLowerCase() === "clear") {
       window.__nexusClear?.();
       return;
     }
 
-    const result = evaluate(rawInput, currentNode);
+    const result = evaluate(rawInput, currentScenario);
 
     if (result.ok) {
-      // Correct!
       playSuccess();
       setState((s) => {
+        const elapsed = Date.now() - (s.levelStartedAt || Date.now());
+        const award = levelAward(elapsed);
         const nextIndex = s.nodeIndex + 1;
-        if (nextIndex >= NODES.length) {
-          return { ...s, feedback: result, phase: PHASE.VICTORY };
+        const newScore = clampScore(s.score + award);
+
+        if (nextIndex >= s.scenarios.length) {
+          return {
+            ...s,
+            feedback: result,
+            phase: PHASE.VICTORY,
+            score: newScore,
+          };
         }
         return {
           ...s,
           feedback: result,
           nodeIndex: nextIndex,
           errors: 0,
+          score: newScore,
+          levelStartedAt: Date.now(),
         };
       });
     } else {
-      // Wrong
       playError();
       setState((s) => {
         const newErrors = s.errors + 1;
+        const afterErrorScore = clampScore(s.score - errorPenalty());
         if (newErrors >= ERRORS_PER_TRAP) {
-          // Activate trap
           playTrap();
-          if (currentNode.trapType === "emp") playEMP();
+          if (currentScenario.trap.type === "emp") playEMP();
           const newLives = s.lives - 1;
           const trapData = {
-            type: currentNode.trapType,
-            message: currentNode.trapMsg,
+            type: currentScenario.trap.type,
+            message: currentScenario.trap.msg,
           };
+          const withTrapPenalty = clampScore(afterErrorScore - trapPenalty());
           if (newLives <= 0) {
-            // Will transition to game over after trap animation
-            return { ...s, feedback: result, errors: 0, trap: trapData, lives: 0 };
+            return {
+              ...s,
+              feedback: result,
+              errors: 0,
+              errorsTotal: s.errorsTotal + 1,
+              trap: trapData,
+              lives: 0,
+              score: withTrapPenalty,
+            };
           }
-          return { ...s, feedback: result, errors: 0, lives: newLives, trap: trapData };
+          return {
+            ...s,
+            feedback: result,
+            errors: 0,
+            errorsTotal: s.errorsTotal + 1,
+            lives: newLives,
+            trap: trapData,
+            score: withTrapPenalty,
+          };
         }
-        return { ...s, feedback: result, errors: newErrors };
+        return {
+          ...s,
+          feedback: result,
+          errors: newErrors,
+          errorsTotal: s.errorsTotal + 1,
+          score: afterErrorScore,
+        };
       });
     }
-  }, [evaluate, currentNode]);
+  }, [evaluate, currentScenario]);
 
   const handleTrapDone = useCallback(() => {
     setState((s) => {
@@ -103,16 +170,25 @@ export default function App() {
     });
   }, []);
 
+  const runData = useMemo(() => ({
+    score: state.score,
+    outcome: state.phase === PHASE.VICTORY ? "victory" : "defeat",
+    nodesCompleted: state.phase === PHASE.VICTORY ? scenarios.length : state.nodeIndex,
+    errors: state.errorsTotal,
+    hints: state.hintsTotal,
+    durationMs: state.runStartedAt ? Date.now() - state.runStartedAt : 0,
+  }), [state, scenarios.length]);
+
   if (state.phase === PHASE.INTRO) {
     return <IntroScreen onStart={handleStart} />;
   }
 
   if (state.phase === PHASE.GAME_OVER) {
-    return <GameOverScreen onRestart={handleRestart} />;
+    return <GameOverScreen onRestart={handleRestart} runData={runData} />;
   }
 
   if (state.phase === PHASE.VICTORY) {
-    return <VictoryScreen onRestart={handleRestart} />;
+    return <VictoryScreen onRestart={handleRestart} runData={runData} />;
   }
 
   return (
@@ -123,18 +199,15 @@ export default function App() {
       overflow: "hidden",
       background: "var(--bg-black)",
     }}>
-      {/* HUD */}
       <HUD
         lives={state.lives}
         currentNode={state.nodeIndex}
-        totalNodes={NODES.length}
+        totalNodes={scenarios.length}
         errors={state.errors}
+        score={state.score}
       />
 
-      {/* Main layout */}
       <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
-
-        {/* Left column: narrative + data */}
         <div style={{
           width: "380px",
           flexShrink: 0,
@@ -143,11 +216,15 @@ export default function App() {
           borderRight: "1px solid rgba(0,255,136,0.2)",
           overflow: "hidden",
         }}>
-          <NarrativePanel node={currentNode} key={state.nodeIndex} />
-          <DataPanel node={currentNode} />
+          <NarrativePanel
+            scenario={currentScenario}
+            totalNodes={scenarios.length}
+            onHintUsed={handleHintUsed}
+            key={state.nodeIndex}
+          />
+          <DataPanel scenario={currentScenario} />
         </div>
 
-        {/* Right column: terminal */}
         <div style={{
           flex: 1,
           display: "flex",
@@ -162,7 +239,7 @@ export default function App() {
             letterSpacing: "0.3em",
             color: "rgba(0,229,255,0.6)",
           }}>
-            TERMINAL — db.{currentNode.collection}
+            TERMINAL — db.{currentScenario.collection}
             <span style={{
               float: "right",
               color: "rgba(0,255,136,0.4)",
@@ -179,7 +256,6 @@ export default function App() {
         </div>
       </div>
 
-      {/* Trap overlay */}
       {state.trap && (
         <TrapOverlay trap={state.trap} onDone={handleTrapDone} />
       )}

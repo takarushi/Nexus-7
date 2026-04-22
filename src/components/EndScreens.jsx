@@ -1,15 +1,18 @@
 // src/components/EndScreens.jsx
 import React, { useEffect, useState } from "react";
 import { playGameOver, playVictory } from "../sounds/audioEngine";
+import { submitRun } from "../ranking/rankingClient";
+import { NameEntry } from "./NameEntry";
+import { Ranking } from "./Ranking";
 
 const ASCII_GAMEOVER = `
  ██████╗  █████╗ ███╗   ███╗███████╗
 ██╔════╝ ██╔══██╗████╗ ████║██╔════╝
-██║  ███╗███████║██╔████╔██║█████╗  
-██║   ██║██╔══██║██║╚██╔╝██║██╔══╝  
+██║  ███╗███████║██╔████╔██║█████╗
+██║   ██║██╔══██║██║╚██╔╝██║██╔══╝
 ╚██████╔╝██║  ██║██║ ╚═╝ ██║███████╗
  ╚═════╝ ╚═╝  ╚═╝╚═╝     ╚═╝╚══════╝
-          ██████╗ ██╗   ██╗███████╗██████╗ 
+          ██████╗ ██╗   ██╗███████╗██████╗
          ██╔═══██╗██║   ██║██╔════╝██╔══██╗
          ██║   ██║██║   ██║█████╗  ██████╔╝
          ██║   ██║╚██╗ ██╔╝██╔══╝  ██╔══██╗
@@ -18,7 +21,7 @@ const ASCII_GAMEOVER = `
 `;
 
 const ASCII_WIN = `
-███████╗██╗   ██╗███████╗████████╗███████╗███╗   ███╗ █████╗ 
+███████╗██╗   ██╗███████╗████████╗███████╗███╗   ███╗ █████╗
 ██╔════╝╚██╗ ██╔╝██╔════╝╚══██╔══╝██╔════╝████╗ ████║██╔══██╗
 ███████╗ ╚████╔╝ ███████╗   ██║   █████╗  ██╔████╔██║███████║
 ╚════██║  ╚██╔╝  ╚════██║   ██║   ██╔══╝  ██║╚██╔╝██║██╔══██║
@@ -51,91 +54,133 @@ function GlitchText({ text, color }) {
   );
 }
 
-export function GameOverScreen({ onRestart }) {
-  useEffect(() => { playGameOver(); }, []);
+/**
+ * Shared container for both endings.
+ */
+function EndLayout({ children, ascii, asciiColor }) {
   return (
     <div style={{
       position: "fixed", inset: 0, zIndex: 2000,
       background: "#050810",
       display: "flex", flexDirection: "column",
-      alignItems: "center", justifyContent: "center",
+      alignItems: "center",
+      padding: "28px",
+      overflowY: "auto",
       fontFamily: "var(--font-display)",
     }}>
-      <GlitchText text={ASCII_GAMEOVER} color="#ff2244" />
+      <GlitchText text={ascii} color={asciiColor} />
+      {children}
+    </div>
+  );
+}
+
+/**
+ * Internal: handles post-game name entry + ranking display. Shared by both
+ * VictoryScreen and GameOverScreen — only colors and copy differ.
+ */
+function EndScreen({
+  accentColor,
+  tagline,
+  onRestart,
+  runData,
+}) {
+  const [highlightId, setHighlightId] = useState(null);
+  const [submitted, setSubmitted] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
+
+  const handleSubmit = async (name) => {
+    const resp = await submitRun({ ...runData, name });
+    if (resp?.id) setHighlightId(resp.id);
+    setSubmitted(true);
+    setReloadKey((k) => k + 1);
+  };
+
+  return (
+    <div style={{
+      display: "flex", flexDirection: "column", alignItems: "center",
+      width: "100%",
+      marginTop: "16px",
+    }}>
       <p style={{
-        color: "rgba(255,34,68,0.7)",
+        color: accentColor,
         fontSize: "12px",
         letterSpacing: "0.3em",
-        margin: "30px 0",
+        margin: "12px 0 20px",
         textAlign: "center",
         lineHeight: "1.8",
+        opacity: 0.85,
       }}>
-        NEXUS-7 HA ELIMINADO TU CONEXIÓN<br />
-        TODOS TUS DATOS HAN SIDO BORRADOS
+        {tagline}
       </p>
-      <button onClick={onRestart} style={{
-        background: "none",
-        border: "2px solid #ff2244",
-        color: "#ff2244",
-        fontFamily: "var(--font-display)",
-        fontSize: "13px",
-        letterSpacing: "0.3em",
-        padding: "12px 30px",
-        cursor: "pointer",
-        boxShadow: "0 0 20px rgba(255,34,68,0.5)",
-        transition: "all 0.2s",
-      }}>
-        [ REINTENTAR INFILTRACIÓN ]
+
+      {!submitted ? (
+        <NameEntry score={runData.score} accent={accentColor} onSubmit={handleSubmit} />
+      ) : (
+        <div style={{
+          color: accentColor,
+          fontFamily: "var(--font-display)",
+          fontSize: "12px",
+          letterSpacing: "0.25em",
+          marginBottom: "18px",
+        }}>
+          RUN REGISTRADO — SCORE {runData.score}
+        </div>
+      )}
+
+      <div style={{ marginTop: "24px", width: "100%", display: "flex", justifyContent: "center" }}>
+        <Ranking
+          accent={accentColor}
+          highlightId={highlightId}
+          reloadKey={reloadKey}
+        />
+      </div>
+
+      <button
+        onClick={onRestart}
+        style={{
+          marginTop: "26px",
+          background: "none",
+          border: `2px solid ${accentColor}`,
+          color: accentColor,
+          fontFamily: "var(--font-display)",
+          fontSize: "13px",
+          letterSpacing: "0.3em",
+          padding: "12px 30px",
+          cursor: "pointer",
+          boxShadow: `0 0 20px ${accentColor}`,
+          marginBottom: "24px",
+        }}
+      >
+        [ NUEVA INFILTRACIÓN ]
       </button>
     </div>
   );
 }
 
-export function VictoryScreen({ onRestart }) {
-  useEffect(() => { playVictory(); }, []);
-  const [show, setShow] = useState(false);
-  useEffect(() => {
-    const t = setTimeout(() => setShow(true), 500);
-    return () => clearTimeout(t);
-  }, []);
-
+export function GameOverScreen({ onRestart, runData }) {
+  useEffect(() => { playGameOver(); }, []);
   return (
-    <div style={{
-      position: "fixed", inset: 0, zIndex: 2000,
-      background: "#050810",
-      display: "flex", flexDirection: "column",
-      alignItems: "center", justifyContent: "center",
-      fontFamily: "var(--font-display)",
-    }}>
-      <GlitchText text={ASCII_WIN} color="#00ff88" />
-      {show && (
-        <div className="fade-in" style={{ textAlign: "center", marginTop: "20px" }}>
-          <p style={{
-            color: "rgba(0,255,136,0.8)",
-            fontSize: "12px",
-            letterSpacing: "0.2em",
-            lineHeight: "1.8",
-            marginBottom: "30px",
-          }}>
-            NEXUS-7 HA SIDO COMPROMETIDO<br />
-            LOS DATOS HAN SIDO LIBERADOS<br />
-            <span style={{ color: "var(--neon-cyan)" }}>MISIÓN COMPLETADA — DATA-BREACHER</span>
-          </p>
-          <button onClick={onRestart} style={{
-            background: "none",
-            border: "2px solid var(--neon-green)",
-            color: "var(--neon-green)",
-            fontFamily: "var(--font-display)",
-            fontSize: "13px",
-            letterSpacing: "0.3em",
-            padding: "12px 30px",
-            cursor: "pointer",
-            boxShadow: "0 0 20px rgba(0,255,136,0.4)",
-          }}>
-            [ NUEVA INFILTRACIÓN ]
-          </button>
-        </div>
-      )}
-    </div>
+    <EndLayout ascii={ASCII_GAMEOVER} asciiColor="#ff2244">
+      <EndScreen
+        accentColor="#ff2244"
+        tagline="NEXUS-7 HA ELIMINADO TU CONEXIÓN · TODOS TUS DATOS HAN SIDO BORRADOS"
+        onRestart={onRestart}
+        runData={runData}
+      />
+    </EndLayout>
+  );
+}
+
+export function VictoryScreen({ onRestart, runData }) {
+  useEffect(() => { playVictory(); }, []);
+  return (
+    <EndLayout ascii={ASCII_WIN} asciiColor="#00ff88">
+      <EndScreen
+        accentColor="#00ff88"
+        tagline="NEXUS-7 HA SIDO COMPROMETIDO · LOS DATOS HAN SIDO LIBERADOS"
+        onRestart={onRestart}
+        runData={runData}
+      />
+    </EndLayout>
   );
 }

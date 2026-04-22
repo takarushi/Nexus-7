@@ -53,16 +53,15 @@ const s = {
   },
 };
 
-export function NarrativePanel({ node }) {
+export function NarrativePanel({ scenario, totalNodes, onHintUsed }) {
   const [displayed, setDisplayed] = useState("");
   const [done, setDone] = useState(false);
 
-  // Typewriter effect for narrative
   useEffect(() => {
     setDisplayed("");
     setDone(false);
     let i = 0;
-    const text = node.narrative;
+    const text = scenario.narrative;
     const interval = setInterval(() => {
       i++;
       setDisplayed(text.slice(0, i));
@@ -72,19 +71,20 @@ export function NarrativePanel({ node }) {
       }
     }, 18);
     return () => clearInterval(interval);
-  }, [node.id]);
+  }, [scenario.id, scenario.narrative]);
 
   const showHint = (n) => {
-    const msg = n === 1 ? node.hint1 : node.hint2;
+    const msg = n === 1 ? scenario.hints.hint1 : scenario.hints.hint2;
     window.__nexusWriteHint?.(`[PISTA ${n}] ${msg}`);
+    onHintUsed?.(n);
   };
 
   return (
     <div style={s.panel}>
       <div style={s.codename}>
-        NODE {node.id}/{5} — {node.codename}
+        NODE {scenario.id}/{totalNodes} — {scenario.codename}
       </div>
-      <div style={s.subtitle}>{node.subtitle}</div>
+      <div style={s.subtitle}>{scenario.subtitle}</div>
 
       <div style={s.narrative}>
         {displayed}
@@ -95,7 +95,7 @@ export function NarrativePanel({ node }) {
         <span style={{ color: "rgba(0,229,255,0.6)", fontSize: "10px", letterSpacing: "0.2em" }}>
           OBJETIVO ▸{" "}
         </span>
-        {node.objective}
+        {scenario.objective}
       </div>
 
       <div style={s.hintRow}>

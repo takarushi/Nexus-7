@@ -1,6 +1,6 @@
 // src/components/HUD.jsx
 import React from "react";
-import { MAX_LIVES, ERRORS_PER_TRAP } from "../data/nodes";
+import { MAX_LIVES, ERRORS_PER_TRAP } from "../levels/registry";
 
 const styles = {
   hud: {
@@ -53,9 +53,18 @@ const styles = {
     color: "var(--neon-green)",
     textShadow: "0 0 10px var(--neon-green)",
   },
+  score: {
+    fontFamily: "var(--font-display)",
+    fontSize: "13px",
+    letterSpacing: "0.25em",
+    color: "var(--neon-cyan)",
+    textShadow: "0 0 10px var(--neon-cyan)",
+    minWidth: "90px",
+    textAlign: "right",
+  },
 };
 
-export function HUD({ lives, currentNode, totalNodes, errors }) {
+export function HUD({ lives, currentNode, totalNodes, errors, score = 0 }) {
   return (
     <div style={styles.hud}>
       {/* Left — lives */}
@@ -68,6 +77,8 @@ export function HUD({ lives, currentNode, totalNodes, errors }) {
             </span>
           ))}
         </div>
+        <span style={styles.label}>SCORE</span>
+        <span style={styles.score}>{score}</span>
       </div>
 
       {/* Center — title */}

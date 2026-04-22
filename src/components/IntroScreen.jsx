@@ -7,6 +7,7 @@ import {
   playIntroStart,
   startIntroAmbient,
 } from "../sounds/audioEngine";
+import { fetchBest } from "../ranking/rankingClient";
 
 const INTRO_LINES = [
   "AÑO 2099. LA CORPORACIÓN NEXUS-7 CONTROLA TODOS LOS DATOS DEL MUNDO.",
@@ -27,6 +28,11 @@ const INTRO_LINES = [
 export function IntroScreen({ onStart }) {
   const [lines, setLines] = useState([]);
   const [ready, setReady] = useState(false);
+  const [best, setBest] = useState(null);
+
+  useEffect(() => {
+    fetchBest().then(setBest);
+  }, []);
 
   useEffect(() => {
     const stopAmbient = startIntroAmbient();
@@ -75,11 +81,27 @@ export function IntroScreen({ onStart }) {
         fontSize: "11px",
         letterSpacing: "0.5em",
         color: "var(--neon-cyan)",
-        marginBottom: "50px",
+        marginBottom: "30px",
         textAlign: "center",
       }}>
         // MONGODB ESCAPE ROOM //
       </div>
+
+      {/* Best player banner */}
+      {best && (
+        <div style={{
+          marginBottom: "24px",
+          padding: "6px 14px",
+          border: "1px solid rgba(0,229,255,0.4)",
+          color: "var(--neon-cyan)",
+          fontFamily: "var(--font-display)",
+          fontSize: "11px",
+          letterSpacing: "0.3em",
+          textShadow: "0 0 8px rgba(0,229,255,0.5)",
+        }}>
+          MEJOR OPERADOR ▸ {best.name} — {best.score} PTS
+        </div>
+      )}
 
       {/* Story lines */}
       <div style={{

@@ -59,7 +59,7 @@ function DocCard({ doc }) {
   );
 }
 
-export function DataPanel({ node }) {
+export function DataPanel({ scenario }) {
   const [showExtra, setShowExtra] = useState(false);
 
   return (
@@ -69,7 +69,6 @@ export function DataPanel({ node }) {
       padding: "16px",
       borderRight: "1px solid rgba(0,255,136,0.2)",
     }}>
-      {/* Collection header */}
       <div style={{
         marginBottom: "12px",
         fontFamily: "var(--font-display)",
@@ -77,14 +76,13 @@ export function DataPanel({ node }) {
         letterSpacing: "0.2em",
         color: "var(--neon-cyan)",
       }}>
-        db.<span style={{ color: "var(--neon-green)" }}>{node.collection}</span>
-        <span style={{ color: "rgba(0,255,136,0.4)" }}> — {node.data.length} docs</span>
+        db.<span style={{ color: "var(--neon-green)" }}>{scenario.collection}</span>
+        <span style={{ color: "rgba(0,255,136,0.4)" }}> — {scenario.data.length} docs</span>
       </div>
 
-      {node.data.map((doc) => <DocCard key={doc._id} doc={doc} />)}
+      {scenario.data.map((doc) => <DocCard key={doc._id} doc={doc} />)}
 
-      {/* Extra collection for lookup */}
-      {node.extraData && (
+      {scenario.extraData && (
         <>
           <button
             onClick={() => setShowExtra(!showExtra)}
@@ -102,9 +100,9 @@ export function DataPanel({ node }) {
               borderRadius: "3px",
             }}
           >
-            {showExtra ? "▼" : "▶"} db.{node.extraCollection} ({node.extraData.length} docs)
+            {showExtra ? "▼" : "▶"} db.{scenario.extraCollection} ({scenario.extraData.length} docs)
           </button>
-          {showExtra && node.extraData.map((doc) => <DocCard key={doc._id} doc={doc} />)}
+          {showExtra && scenario.extraData.map((doc) => <DocCard key={doc._id} doc={doc} />)}
         </>
       )}
     </div>

@@ -1,8 +1,26 @@
 services:
-  nexus7:
+  server:
+    build: ./server
+    image: nexus7-server:latest
+    container_name: nexus7-server
+    restart: unless-stopped
+    environment:
+      PORT: "3001"
+      DB_PATH: "/data/nexus7.db"
+    volumes:
+      - nexus7-data:/data
+    expose:
+      - "3001"
+
+  web:
     build: .
     image: nexus7-escape-room:latest
     container_name: nexus7
+    depends_on:
+      - server
     ports:
       - "8080:80"
     restart: unless-stopped
+
+volumes:
+  nexus7-data:
