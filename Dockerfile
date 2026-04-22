@@ -6,7 +6,9 @@ WORKDIR /app
 
 COPY package.json ./
 COPY package-lock.json* ./
-RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
+# Use npm install (not ci) to tolerate lockfile drift caused by local
+# npm vs container npm version differences.
+RUN npm install --no-audit --no-fund
 
 COPY public ./public
 COPY src ./src
@@ -14,6 +16,9 @@ COPY src ./src
 ENV CI=true
 ENV GENERATE_SOURCEMAP=false
 ENV DISABLE_ESLINT_PLUGIN=true
+# Override the homepage in package.json (gh-pages sets it to /Nexus-7/ which
+# breaks when served from nginx at /). Docker build goes to /.
+ENV PUBLIC_URL=/
 RUN npm run build
 
 # ---------- Runtime stage ----------

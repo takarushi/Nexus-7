@@ -1,5 +1,5 @@
 // src/App.jsx
-import React, { useState, useCallback, useMemo, useRef } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import { buildGameRun, MAX_LIVES, ERRORS_PER_TRAP } from "./levels/registry";
 import { useQueryEvaluator } from "./hooks/useQueryEvaluator";
 import { HUD } from "./components/HUD";
@@ -49,7 +49,6 @@ export default function App() {
   const [run, setRun] = useState(() => buildGameRun());
   const [state, setState] = useState(() => initialState(run.scenarios));
   const { evaluate } = useQueryEvaluator();
-  const hintUsedForNodeRef = useRef(new Set());
 
   const scenarios = state.scenarios;
   const currentScenario = scenarios[state.nodeIndex];
@@ -65,23 +64,19 @@ export default function App() {
   }, []);
 
   const handleRestart = useCallback(() => {
-    hintUsedForNodeRef.current = new Set();
     const fresh = buildGameRun();
     setRun(fresh);
     setState(initialState(fresh.scenarios));
   }, []);
 
-  const handleHintUsed = useCallback((n) => {
-    // Only penalize the first use of each hint per node (avoid farming clicks)
-    const key = `${state.nodeIndex}:${n}`;
-    if (hintUsedForNodeRef.current.has(key)) return;
-    hintUsedForNodeRef.current.add(key);
+  // Every click of a hint button penalizes. No dedup — spam costs score.
+  const handleHintUsed = useCallback(() => {
     setState((s) => ({
       ...s,
       score: clampScore(s.score - hintPenalty()),
       hintsTotal: s.hintsTotal + 1,
     }));
-  }, [state.nodeIndex]);
+  }, []);
 
   const handleSubmit = useCallback((rawInput) => {
     if (rawInput.toLowerCase() === "clear") {

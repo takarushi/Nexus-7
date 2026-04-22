@@ -32,9 +32,13 @@ export async function submitRun(run) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(run),
     });
-    if (!r.ok) return null;
+    if (!r.ok) {
+      console.error("[nexus7] submitRun failed:", r.status, await r.text().catch(() => ""));
+      return null;
+    }
     return await r.json();
-  } catch (_) {
+  } catch (err) {
+    console.error("[nexus7] submitRun network error:", err);
     return null;
   }
 }
