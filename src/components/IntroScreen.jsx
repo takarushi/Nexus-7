@@ -5,9 +5,13 @@ import {
   playIntroLine,
   playIntroReady,
   playIntroStart,
-  startIntroAmbient,
+  playIntroMusic,
+  getIntroMusicVolume,
+  setIntroMusicVolume,
 } from "../sounds/audioEngine";
 import { fetchBest } from "../ranking/rankingClient";
+import { LEVELS } from "../levels/registry";
+import { Ranking } from "./Ranking";
 
 const INTRO_LINES = [
   "AÑO 2099. LA CORPORACIÓN NEXUS-7 CONTROLA TODOS LOS DATOS DEL MUNDO.",
@@ -18,24 +22,32 @@ const INTRO_LINES = [
   "",
   "TIENES 3 VIDAS. CADA 3 ERRORES EN UN NODO: PIERDES UNA.",
   "",
-  "HAY 5 NODOS. CADA UNO CUSTODIADO POR UNA IA.",
+  `HAY ${LEVELS.length} NODOS. CADA UNO CUSTODIADO POR UNA IA.`,
   "",
   "TU ARMA: MONGODB QUERY LANGUAGE.",
   "",
-  "▸ INFILTRA NEXUS-7. LIBERA LOS DATOS.",
+  "▸ INFILTRA NEXUS-7. LIBERA LOS DATOS."
 ];
 
 export function IntroScreen({ onStart }) {
   const [lines, setLines] = useState([]);
   const [ready, setReady] = useState(false);
   const [best, setBest] = useState(null);
+  const [volume, setVolume] = useState(getIntroMusicVolume);
+  const [showRanking, setShowRanking] = useState(false);
+
+  const handleVolumeChange = (e) => {
+    const v = parseFloat(e.target.value);
+    setVolume(v);
+    setIntroMusicVolume(v);
+  };
 
   useEffect(() => {
     fetchBest().then(setBest);
   }, []);
 
   useEffect(() => {
-    const stopAmbient = startIntroAmbient();
+    const stopMusic = playIntroMusic();
     playIntroBoot();
     let i = 0;
     const iv = setInterval(() => {
@@ -52,7 +64,7 @@ export function IntroScreen({ onStart }) {
         }, 600);
       }
     }, 300);
-    return () => { clearInterval(iv); stopAmbient(); };
+    return () => { clearInterval(iv); stopMusic(); };
   }, []);
 
   return (
@@ -153,6 +165,104 @@ export function IntroScreen({ onStart }) {
         >
           [ INICIAR INFILTRACIÓN ]
         </button>
+      )}
+
+      {/* Volume control */}
+      <div style={{
+        position: "absolute",
+        bottom: "18px",
+        left: "28px",
+        display: "flex",
+        alignItems: "center",
+        gap: "10px",
+        fontFamily: "var(--font-display)",
+        fontSize: "10px",
+        letterSpacing: "0.25em",
+        color: "rgba(0,229,255,0.6)",
+      }}>
+        <span>{volume === 0 ? "🔇" : volume < 0.4 ? "🔈" : volume < 0.7 ? "🔉" : "🔊"}</span>
+        <span>VOL</span>
+        <input
+          type="range"
+          min="0"
+          max="1"
+          step="0.05"
+          value={volume}
+          onChange={handleVolumeChange}
+          aria-label="Volumen de la música"
+          style={{
+            width: "120px",
+            accentColor: "var(--neon-cyan)",
+            cursor: "pointer",
+          }}
+        />
+        <span style={{ minWidth: "28px", textAlign: "right", color: "rgba(0,229,255,0.4)" }}>
+          {Math.round(volume * 100)}
+        </span>
+        <button
+          onClick={() => setShowRanking(true)}
+          style={{
+            marginLeft: "14px",
+            background: "none",
+            border: "1px solid rgba(0,229,255,0.4)",
+            color: "var(--neon-cyan)",
+            fontFamily: "var(--font-display)",
+            fontSize: "10px",
+            letterSpacing: "0.3em",
+            padding: "5px 12px",
+            cursor: "pointer",
+          }}
+        >
+          [ RANKING ]
+        </button>
+      </div>
+
+      {/* Ranking overlay */}
+      {showRanking && (
+        <div
+          onClick={(e) => { if (e.target === e.currentTarget) setShowRanking(false); }}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 3500,
+            background: "rgba(5,8,16,0.92)",
+            backdropFilter: "blur(4px)",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "40px 20px",
+            overflowY: "auto",
+          }}
+        >
+          <div style={{
+            fontFamily: "var(--font-display)",
+            fontSize: "16px",
+            letterSpacing: "0.4em",
+            color: "var(--neon-cyan)",
+            textShadow: "0 0 12px var(--neon-cyan)",
+            marginBottom: "22px",
+          }}>
+            TOP OPERADORES
+          </div>
+          <Ranking limit={10} accent="var(--neon-cyan)" />
+          <button
+            onClick={() => setShowRanking(false)}
+            style={{
+              marginTop: "24px",
+              background: "none",
+              border: "1px solid var(--neon-cyan)",
+              color: "var(--neon-cyan)",
+              fontFamily: "var(--font-display)",
+              fontSize: "11px",
+              letterSpacing: "0.3em",
+              padding: "8px 22px",
+              cursor: "pointer",
+            }}
+          >
+            [ CERRAR ]
+          </button>
+        </div>
       )}
 
       {/* Credit */}

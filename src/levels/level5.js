@@ -37,7 +37,7 @@ export const level5 = {
       id: 5,
       codename: "THE CORE",
       subtitle: "Núcleo Central — NEXUS-7",
-      narrative: `ÚLTIMO NODO. Estás en el corazón de NEXUS-7.
+      narrative: `Estás en el corazón de NEXUS-7.
 La IA maestra "OMEGA-CORE" controla los reactores.
 ${carryIn?.projectCode ? `El proyecto comprometido ${carryIn.projectCode} desviaba potencia desde aquí.` : ""}
 Para apagarla necesitas calcular el consumo total de energía

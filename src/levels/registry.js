@@ -8,9 +8,10 @@ import { level2 } from "./level2";
 import { level3 } from "./level3";
 import { level4 } from "./level4";
 import { level5 } from "./level5";
+import { level6 } from "./level6";
 import { makeRng } from "./rng";
 
-export const LEVELS = [level1, level2, level3, level4, level5];
+export const LEVELS = [level1, level2, level3, level4, level5, level6];
 
 export const MAX_LIVES = 3;
 export const ERRORS_PER_TRAP = 3;
