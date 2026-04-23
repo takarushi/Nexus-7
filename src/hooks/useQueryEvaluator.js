@@ -6,6 +6,7 @@
 
 import { useCallback } from "react";
 import mingo from "mingo";
+import "mingo/init/system";
 
 function parseQuery(raw) {
   let str = raw.trim();
@@ -27,8 +28,15 @@ function runFind(queryObj, data) {
   return mingo.find(data, queryObj).all();
 }
 
-function runAggregate(pipeline, data) {
-  return mingo.aggregate(data, pipeline);
+function runAggregate(pipeline, scenario) {
+  const resolver = (name) => {
+    if (name === scenario.collection) return scenario.data;
+    if (name === scenario.extraCollection) return scenario.extraData || [];
+    return [];
+  };
+  return mingo.aggregate(scenario.data, pipeline, {
+    collectionResolver: resolver,
+  });
 }
 
 function crypticError(type) {
@@ -57,7 +65,7 @@ export function useQueryEvaluator() {
     try {
       const parsed = parseQuery(rawInput);
       const results = Array.isArray(parsed)
-        ? runAggregate(parsed, scenario.data)
+        ? runAggregate(parsed, scenario)
         : runFind(parsed, scenario.data);
 
       if (results.length === 0) {

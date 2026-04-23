@@ -3,7 +3,6 @@
 // is led by the employee carried from N1.
 
 import { matchByIds } from "./matchers";
-import { pick } from "./rng";
 
 const PROJECT_NAMES = [
   "Project Lazarus",
@@ -59,8 +58,8 @@ Debes confirmarlo uniendo las colecciones projects y employees.`,
       extraCollection: "employees",
       extraData,
       hints: {
-        hint1: "aggregate() recibe un array de stages. Primero $lookup, luego $match.",
-        hint2: `db.projects.aggregate([{ $lookup: { from: "employees", localField: "leaderId", foreignField: "_id", as: "leader" } }, { $match: { status: "COMPROMISED" } }])`,
+        hint1: "aggregate() recibe un array de stages. Primero $match, luego $lookup.",
+        hint2: `db.projects.aggregate([{$match: {status: "COMPROMISED"}}, {$lookup: {from: "employees", localField: "leaderId", foreignField: "_id",as: "leader"}}])`,
       },
       trap: {
         name: "FIREWALL INVERSO",
@@ -68,7 +67,13 @@ Debes confirmarlo uniendo las colecciones projects y employees.`,
         type: "firewall",
       },
       accessCode: `DELTA-2209-${compromisedName.split(" ")[1].toUpperCase()}`,
-      evaluate: matchByIds(matchIds),
+      evaluate: (results) => {
+        if (!Array.isArray(results) || results.length !== 1) return false;
+        const doc = results[0];
+        if (doc.status !== "COMPROMISED") return false;
+        if (!Array.isArray(doc.leader) || doc.leader.length === 0) return false;
+        return doc.leader.some((l)=> String(l._id) === String(leaderId));
+      },
     };
 
     const carryOut = { ...carryIn, projectCode: compromisedName };
