@@ -60,7 +60,7 @@ Debes confirmarlo uniendo las colecciones projects y employees.`,
       extraData,
       hints: {
         hint1: "aggregate() recibe un array de stages. Primero $lookup, luego $match.",
-        hint2: `db.projects.aggregate([{ $lookup: { from: "employees", localField: "leaderId", foreignField: "_id", as: "leader" } }, { $match: { status: "COMPROMISED" } }])`,
+        hint2: `db.projects.aggregate([{$match:{status:"COMPROMISED"}},{$lookup:{from:"employees",localField:"leaderId",foreignField:"_id",as:"leader"}}])`,
       },
       trap: {
         name: "FIREWALL INVERSO",
